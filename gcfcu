@@ -37,19 +37,26 @@ check_cachedir() {
 	find "$cache_dir" -mtime +0 -exec echo rm {} \+
 }
 
+# Extract a value from a HTML element
+get_value() {
+	sed -e "/$1/!d" -e 's/.*value="//; s/".*//; q' $2
+}
+
+# Empty the cache
+clean_cache() {
+	rm -rf "$cache_dir"
+}
+
 # Make a request directly
 req() {
 	local url="$site_base$1"
 	shift
 	test -n "$opt_verbose" && echo req $url >&2
-	#check_cookies
 	curl -s -b "$cookie_jar" -c "$cookie_jar" "$url" $@
 }
 
 # Make a request, cached
 req_cached() {
-	#check_cachedir
-
 	local cache_file="$cache_dir/$(echo $1 | sed 's/\//-/g')"
 	if test -z "$opt_nocache" -a -s "$cache_file"
 	then cat "$cache_file"
@@ -64,8 +71,8 @@ signin() {
 	tmp="$(mktemp)"
 	trap "rm '$tmp'" 0
 	req '/' > "$tmp"
-	viewstate="$(sed '/__VIEWSTATE/!d; s/.*value="//; s/".*//; q' "$tmp")"
-	eventval="$(sed '/__EVENTVALIDATION/!d; s/.*value="//; s/".*//; q' "$tmp")"
+	viewstate="$(get_value __VIEWSTATE "$tmp")"
+	eventval="$(get_value __EVENTVALIDATION "$tmp")"
 
 	if test -n "$GCFCU_USERNAME"
 	then username="$GCFCU_USERNAME"
@@ -83,7 +90,6 @@ signin() {
 		--data-urlencode "txtUsername=$username" \
 		--data-urlencode "__EVENTVALIDATION=$eventval" \
 		--data-urlencode "__EVENTTARGET=cmdLogin" \
-		--data-urlencode "__EVENTARGUMENT=" \
 		--data-urlencode "__VIEWSTATE=$viewstate"
 
 	if ! grep -q "Continue with Security Code" "$tmp"; then
@@ -92,14 +98,11 @@ signin() {
 		return 1
 	fi
 
-	viewstate="$(sed '/__VIEWSTATE/!d; s/.*value="//; s/".*//; q' "$tmp")"
-	eventval="$(sed '/__EVENTVALIDATION/!d; s/.*value="//; s/".*//; q' "$tmp")"
+	viewstate="$(get_value __VIEWSTATE "$tmp")"
+	eventval="$(get_value __EVENTVALIDATION "$tmp")"
 
 	req >"$tmp" '/SignOn.aspx' \
 		-e "$site_base" \
-		--data-urlencode "__LASTFOCUS=" \
-		--data-urlencode "__EVENTTARGET=" \
-		--data-urlencode "__EVENTARGUMENT=" \
 		--data-urlencode "__VIEWSTATE=$viewstate" \
 		--data-urlencode "__EVENTVALIDATION=$eventval" \
 		-d "_ctl0%3APageWorkSpace%3ASecurityCodeImage1%3AbtnContinueSecurityCode=Continue+with+Security+Code"
@@ -114,7 +117,54 @@ signin() {
 		return 1
 	fi
 
-	req >"$tmp" "/OOBChallenge.aspx$oob" -o oob.html
+	req >"$tmp" "/OOBChallenge.aspx$oob"
+	if ! grep -q 'Tell us where to reach you' "$tmp"; then
+		echo 'Missing OOB challenge' >&2
+		return 1
+	fi
+
+	viewstate="$(get_value __VIEWSTATE "$tmp")"
+	eventval="$(get_value __EVENTVALIDATION "$tmp")"
+	phone_mask="$(get_value _hdnSelectedMaskNum "$tmp")"
+
+	echo 'Receive One-Time Security Code by:'
+	echo "[p]hone ($phone_mask)"
+	echo "[t]ext message"
+	sec_code_text "$oob"; return $?; ##
+	while true; do
+		read -p '? ' resp
+		case "$resp" in
+			p) sec_code_phone "$oob"; return $?;;
+			t) sec_code_text "$oob"; return $?;;
+		esac
+	done
+}
+
+# Receive one-time security code from user by text message
+sec_code_text() {
+	local oob="$1"
+	req >"$tmp" "/OOBChallenge.aspx$oob" \
+		-e "$site_base" \
+		--data-urlencode "__EVENTVALIDATION=$eventval" \
+		--data-urlencode "__VIEWSTATE=$viewstate" \
+		-d "_ctl0%3APageWorkSpace%3AhdnSelectedNum=7" \
+		-d "_ctl0%3APageWorkSpace%3AbtnContinue=Continue"
+
+	oob="$(grep OOBChallengeText "$tmp" | \
+		sed "s/.*OOBChallengeText\.aspx//; s/'.*//")"
+	if test -z "$oob"; then
+		echo 'Unable to get OOBChallengeText' >&2
+		return 1
+	fi
+
+	req >"$tmp" "/OOBChallengeText.aspx$oob"
+	grep 'Enter your mobile phone number' "$tmp"
+	cp $tmp text2.html
+}
+
+# Receive one-time security code from user by phone
+sec_code_phone() {
+	false
 }
 
 main() {
@@ -136,6 +186,7 @@ main() {
 	set -- $args
 	case "$cmd" in
 		'') signin;;
+		clean-cache) clean_cache $@;;
 	esac
 }
 
