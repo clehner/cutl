@@ -60,7 +60,7 @@ req_cached() {
 }
 
 signin() {
-	local username password viewstate eventval tmp
+	local username password viewstate eventval tmp oob
 	tmp="$(mktemp)"
 	trap "rm '$tmp'" 0
 	req '/' > "$tmp"
@@ -79,20 +79,42 @@ signin() {
 	else stty -echo; read -rp 'Passphrase: ' password; echo >&2; stty echo
 	fi
 
-	local redir="$(req '/login.aspx' -i \
+	req >"$tmp" '/login.aspx' -L -e "$site_base" \
 		--data-urlencode "txtUsername=$username" \
 		--data-urlencode "__EVENTVALIDATION=$eventval" \
 		--data-urlencode "__EVENTTARGET=cmdLogin" \
 		--data-urlencode "__EVENTARGUMENT=" \
-		--data-urlencode "__VIEWSTATE=$viewstate" | \
-		tee login.html | \
-		sed '/^Location: .*SignOn\.aspx/!d; s/.*SignOn\.aspx//;
-	s/[^a-zA-Z0-9=-]$//; q')"
-	test -n "$redir" || {
-		echo 'Unable to get signon redirect' >&2
-		return 2
-	}
-	req "/Signon.aspx$redir" -i | tee signon.html
+		--data-urlencode "__VIEWSTATE=$viewstate"
+
+	if ! grep -q "Continue with Security Code" "$tmp"; then
+		echo Security code not asked for. See /tmp/gcfcu-out.html
+		cp "$tmp" /tmp/gcfcu-out.html
+		return 1
+	fi
+
+	viewstate="$(sed '/__VIEWSTATE/!d; s/.*value="//; s/".*//; q' "$tmp")"
+	eventval="$(sed '/__EVENTVALIDATION/!d; s/.*value="//; s/".*//; q' "$tmp")"
+
+	req >"$tmp" '/SignOn.aspx' \
+		-e "$site_base" \
+		--data-urlencode "__LASTFOCUS=" \
+		--data-urlencode "__EVENTTARGET=" \
+		--data-urlencode "__EVENTARGUMENT=" \
+		--data-urlencode "__VIEWSTATE=$viewstate" \
+		--data-urlencode "__EVENTVALIDATION=$eventval" \
+		-d "_ctl0%3APageWorkSpace%3ASecurityCodeImage1%3AbtnContinueSecurityCode=Continue+with+Security+Code"
+	if grep -q 'Processing Error' "$tmp"; then
+		echo Error >&2
+		return 1
+	fi
+
+	oob="$(grep OOBChallenge "$tmp" | sed "s/.*OOBChallenge\.aspx//; s/'.*//")"
+	if test -z "$oob"; then
+		echo 'Unable to get OOBChallenge' >&2
+		return 1
+	fi
+
+	req >"$tmp" "/OOBChallenge.aspx$oob" -o oob.html
 }
 
 main() {
