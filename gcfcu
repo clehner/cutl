@@ -1,0 +1,123 @@
+#!/bin/sh
+#set -x
+
+site_base=https://secure.cuaccount-access.com/GeneseeCoopFCU
+cookie_jar=${SIMPLE_COOKIEJAR:-~/.gcfcu_cookies.txt}
+cookie_jar_checked=
+cache_dir="/tmp/gcfcu-$USER"
+cache_dir_checked=
+
+opt_verbose=
+opt_nocache=
+opt_raw=
+opt_help=
+
+# Check if a file is accessible to other users
+insecure_file() {
+	test -n "$(find "$1" -maxdepth 0 -perm +066 2>&-;
+		find "$1" -maxdepth 0 -perm /066 2>&-)"
+}
+
+# Check the cookie file and create it if necessary
+check_cookies() {
+	test -n "$cookie_jar_checked" && return
+	test -e "$cookie_jar" || touch "$cookie_jar"
+	insecure_file "$cookie_jar" && chmod 600 "$cookie_jar"
+	cookie_jar_checked=1
+}
+
+# Check the cache dir and create if it necessary
+check_cachedir() {
+	test -n "$cache_dir_checked" && return
+	test -d "$cache_dir" || mkdir -p "$cache_dir"
+	insecure_file "$cache_dir" || chmod 700 "$cache_dir"
+	cache_dir_checked=1
+
+	# Clean out the cache dir. delete files older than one day
+	find "$cache_dir" -mtime +0 -exec echo rm {} \+
+}
+
+# Make a request directly
+req() {
+	local url="$site_base$1"
+	shift
+	test -n "$opt_verbose" && echo req $url >&2
+	#check_cookies
+	curl -s -b "$cookie_jar" -c "$cookie_jar" "$url" $@
+}
+
+# Make a request, cached
+req_cached() {
+	#check_cachedir
+
+	local cache_file="$cache_dir/$(echo $1 | sed 's/\//-/g')"
+	if test -z "$opt_nocache" -a -s "$cache_file"
+	then cat "$cache_file"
+	else
+		trap "rm $cache_file" 1 2 15
+		req $@ | tee "$cache_file"
+	fi
+}
+
+signin() {
+	local username password viewstate eventval tmp
+	tmp="$(mktemp)"
+	trap "rm '$tmp'" 0
+	req '/' > "$tmp"
+	viewstate="$(sed '/__VIEWSTATE/!d; s/.*value="//; s/".*//; q' "$tmp")"
+	eventval="$(sed '/__EVENTVALIDATION/!d; s/.*value="//; s/".*//; q' "$tmp")"
+
+	if test -n "$GCFCU_USERNAME"
+	then username="$GCFCU_USERNAME"
+	else read -rp 'Username: ' username
+	fi
+
+	if test -n "$GCFCU_PASSWORD"
+	then password="$GCFCU_PASSWORD"
+	elif test -n "$GCFCU_PASSCMD"
+	then password="$(sh -c "$GCFCU_PASSCMD")"
+	else stty -echo; read -rp 'Passphrase: ' password; echo >&2; stty echo
+	fi
+
+	local redir="$(req '/login.aspx' -i \
+		--data-urlencode "txtUsername=$username" \
+		--data-urlencode "__EVENTVALIDATION=$eventval" \
+		--data-urlencode "__EVENTTARGET=cmdLogin" \
+		--data-urlencode "__EVENTARGUMENT=" \
+		--data-urlencode "__VIEWSTATE=$viewstate" | \
+		tee login.html | \
+		sed '/^Location: .*SignOn\.aspx/!d; s/.*SignOn\.aspx//;
+	s/[^a-zA-Z0-9=-]$//; q')"
+	test -n "$redir" || {
+		echo 'Unable to get signon redirect' >&2
+		return 2
+	}
+	req "/Signon.aspx$redir" -i | tee signon.html
+}
+
+main() {
+	local args=
+	local cmd=
+	for arg; do
+		case "$arg" in
+			-v|--verbose) opt_verbose=1;;
+			-n|--no-cache) opt_nocache=1;;
+			-r|--raw) opt_raw=1;;
+			-h|--help) opt_help=1;;
+			*)
+				if test -z "$cmd"
+				then cmd="$arg"
+				else args="$args $arg"
+				fi
+		esac
+	done
+	set -- $args
+	case "$cmd" in
+		'') signin;;
+	esac
+}
+
+check_cookies
+check_cachedir
+
+main $@
