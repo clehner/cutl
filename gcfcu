@@ -143,7 +143,7 @@ signin() {
 # Receive one-time security code from user by text message
 sec_code_text() {
 	local oob="$1"
-	req >"$tmp" "/OOBChallenge.aspx$oob" \
+	req >"$tmp" "/OOBChallenge.aspx" \
 		-e "$site_base" \
 		--data-urlencode "__EVENTVALIDATION=$eventval" \
 		--data-urlencode "__VIEWSTATE=$viewstate" \
@@ -158,8 +158,32 @@ sec_code_text() {
 	fi
 
 	req >"$tmp" "/OOBChallengeText.aspx$oob"
-	grep 'Enter your mobile phone number' "$tmp"
-	cp $tmp text2.html
+	if ! grep -q 'Enter your mobile phone number' "$tmp"; then
+		echo 'Unable to get to mobile phone number prompt' >&2
+		return 1
+	fi
+	viewstate="$(get_value __VIEWSTATE "$tmp")"
+	eventval="$(get_value __EVENTVALIDATION "$tmp")"
+
+	read -p 'Mobile phone number (___ ___ ____): ' num_1 num_2 num_3
+	locale=1078
+	num_country=
+	num_int=
+	#locale=1079 #international
+	req >"$tmp" "/OOBChallengeText.aspx" -L \
+		-d "__EVENTVALIDATION=$eventval" \
+		-d "__VIEWSTATE=$viewstate" \
+		-d "_ctl0%3APageWorkSpace%3AddlLocale=$locale" \
+		-d "_ctl0%3APageWorkSpace%3AtxtNumber1=$num_1" \
+		-d "_ctl0%3APageWorkSpace%3AtxtNumber2=$num_2" \
+		-d "_ctl0%3APageWorkSpace%3AtxtNumber3=$num_3" \
+		-d "_ctl0%3APageWorkSpace%3AtxtCountryCode=$num_country" \
+		-d "_ctl0%3APageWorkSpace%3AtxtIntNum=$num_int" \
+		-d "_ctl0%3APageWorkSpace%3AbtnSendMessage=Send+text+message"
+	if grep -q 'Processing Error' "$tmp"; then
+		echo Error >&2
+		return 1
+	fi
 }
 
 # Receive one-time security code from user by phone
