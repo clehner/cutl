@@ -1,7 +1,6 @@
 #!/bin/sh
 #set -x
 
-rcfile=~/.config/gcfcurc
 site_base=https://secure.cuaccount-access.com/
 cache_dir="/tmp/gcfcu-$USER"
 cache_dir_checked=
@@ -18,7 +17,8 @@ tmp=
 viewstate=
 eventval=
 
-test -e "$rcfile" && . "$rcfile"
+test -f "${GCFCU_CONFIG_FILE:="${XDG_CONFIG_HOME:-~/.config}/gcfcurc"}" &&
+	. "$GCFCU_CONFIG_FILE"
 
 cu_name=${GCFCU_CU_NAME:-GeneseeCoopFCU}
 site_dir=${GCFCU_CU_SITE:-$site_base$cu_name}
