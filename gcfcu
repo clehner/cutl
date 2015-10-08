@@ -348,16 +348,16 @@ tsv_to_ledger() {
 }
 
 transactions() {
-	local format tmp viewstate eventval acct period
-	local state= opt_format= begin= end= postprocess=
+	local format tmp viewopt eventval acct period
+	local opt= opt_format= begin= end= postprocess=
 
 	for arg; do
-		case $state in
+		case $opt in
 			'')
 				case "$arg" in
-					-f|--format) state=format;;
-					-b|--begin) state=begin;;
-					-e|--end) state=end;;
+					-f|--format) opt=format;;
+					-b|--begin) opt=begin;;
+					-e|--end) opt=end;;
 					-c|--current) period=0;;
 					-a|--all) period=1;;
 					-y|--yesterday) period=3;;
@@ -368,9 +368,9 @@ transactions() {
 					*) echo "Unknown argument $arg" >&2; return 1;;
 				esac
 				;;
-			format) opt_format="$arg"; state=;;
-			begin) begin="$arg"; state=;;
-			end) end="$arg"; state=;;
+			format) opt_format="$arg"; opt=;;
+			begin) begin="$arg"; opt=;;
+			end) end="$arg"; opt=;;
 		esac
 	done
 
@@ -446,17 +446,17 @@ accounts_overview() {
 }
 
 main() {
-	local args= cmd= state=
+	local args= cmd= opt=
 	for arg; do
-		case $state in
+		case $opt in
 			'')
 				case "$arg" in
 					-v|--verbose) opt_verbose=1;;
 					-n|--no-cache) opt_nocache=1;;
 					-r|--raw) opt_raw=1;;
 					-h|--help) opt_help=1;;
-					-m|--method) state=method;;
-					-a|--account) state=account;;
+					-m|--method) opt=method;;
+					-a|--account) opt=account;;
 					*)
 						if test -z "$cmd"
 						then cmd="$arg"
@@ -464,8 +464,8 @@ main() {
 						fi
 				esac
 				;;
-			account) opt_account="$arg"; state=;;
-			method) opt_method="$arg"; state=;;
+			account) opt_account="$arg"; opt=;;
+			method) opt_method="$arg"; opt=;;
 		esac
 	done
 	set -- $args
