@@ -2,7 +2,8 @@
 #set -x
 
 site_base=https://secure.cuaccount-access.com/GeneseeCoopFCU
-cookie_jar=${SIMPLE_COOKIEJAR:-~/.gcfcu_cookies.txt}
+rcfile=~/.config/gcfcurc
+cookie_jar=${GCFCU_COOKIEJAR:-~/.gcfcu_cookies.txt}
 cookie_jar_checked=
 cache_dir="/tmp/gcfcu-$USER"
 cache_dir_checked=
@@ -11,6 +12,8 @@ opt_verbose=
 opt_nocache=
 opt_raw=
 opt_help=
+
+test -e "$rcfile" && . "$rcfile"
 
 # Check if a file is accessible to other users
 insecure_file() {
@@ -57,7 +60,7 @@ req() {
 
 # Make a request, cached
 req_cached() {
-	local cache_file="$cache_dir/$(echo $1 | sed 's/\//-/g')"
+	local cache_file="$cache_dir/$(echo ${1%%\?*} | sed 's/\//-/g')"
 	if test -z "$opt_nocache" -a -s "$cache_file"
 	then cat "$cache_file"
 	else
@@ -67,7 +70,7 @@ req_cached() {
 }
 
 signin() {
-	local username password viewstate eventval tmp oob
+	local username password viewstate eventval tmp oob resp
 	tmp="$(mktemp)"
 	trap "rm '$tmp'" 0
 	req '/' > "$tmp"
@@ -142,7 +145,7 @@ signin() {
 
 # Receive one-time security code from user by text message
 sec_code_text() {
-	local oob="$1"
+	local oob="$1" locale num_1= num_2= num_3= num_country= num_int= resp
 	req >"$tmp" "/OOBChallenge.aspx" \
 		-e "$site_base" \
 		--data-urlencode "__EVENTVALIDATION=$eventval" \
@@ -165,11 +168,27 @@ sec_code_text() {
 	viewstate="$(get_value __VIEWSTATE "$tmp")"
 	eventval="$(get_value __EVENTVALIDATION "$tmp")"
 
-	read -p 'Mobile phone number (___ ___ ____): ' num_1 num_2 num_3
-	locale=1078
-	num_country=
-	num_int=
-	#locale=1079 #international
+	if test -n "$GCFCU_PHONE_US"; then
+		locale=1078
+		read num_1 num_2 num_3 <<-EOF
+		$GCFCU_PHONE_US
+		EOF
+	elif test -n "$GCFCU_PHONE"; then
+		locale=1079
+		read num_country num_int <<-EOF
+		$GCFCU_PHONE
+		EOF
+	elif read -p 'Mobile phone is in US/Canada? [Y/n] ' resp
+		test "$resp" != 'n'
+	then
+		locale=1078
+		read -p 'Mobile phone number (___ ___ ____): ' num_1 num_2 num_3
+	else
+		locale=1079
+		read -p 'Country code: ' num_country
+		read -p 'Phone number: ' num_int
+	fi
+
 	req >"$tmp" "/OOBChallengeText.aspx" -L \
 		-d "__EVENTVALIDATION=$eventval" \
 		-d "__VIEWSTATE=$viewstate" \
