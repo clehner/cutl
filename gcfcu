@@ -399,6 +399,31 @@ transactions() {
 		esac
 }
 
+accounts_overview() {
+	local opt_no_header= header_sed=
+	for arg; do
+		case "$arg" in
+			-H|--no-header) opt_no_header=1;;
+			*) echo "Unknown argument $arg" >&2;;
+		esac
+	done
+	if test -z "$opt_no_header"; then
+		header_sed='/lblWelcomeMsg/ {
+			s/.*>Welcome \([^,]*\) *,.*last time you signed on was \([^.]*\).*last failed sign on was \([^.]*\).*/Name: \1\nLast sign on: \2\nLast failed sign on: \3\n/
+			p
+		}
+		/<thead>/ {
+			s/.*/ID	Account Name	Number	Available Balance	Current Balance/
+			p
+		}
+		'
+	fi
+	req_cached '/AcctOverview.aspx' | sed "
+	$header_sed
+	/AcctDetail/!d
+	s/.*<a[^>]*id=\([0-9a-z-]*\).>\([^<]*\).*<a[^>]*>\([^<]*\).*<span>\([^<]*\).*<span>\([^<]*\).*/\1	\2	\3	\4	\5/"
+}
+
 main() {
 	local args= cmd= state=
 	for arg; do
@@ -426,6 +451,7 @@ main() {
 	case "$cmd" in
 		'') foo;;
 		signin) signin;;
+		accounts) accounts_overview $@;;
 		transactions) transactions $@;;
 		clean-cache) clean_cache $@;;
 	esac
