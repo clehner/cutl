@@ -11,6 +11,8 @@ opt_verbose=
 opt_nocache=
 opt_raw=
 opt_help=
+opt_method=
+opt_account=
 
 tmp=
 viewstate=
@@ -168,7 +170,7 @@ signin_sec() {
 	eventval="$(get_value __EVENTVALIDATION "$tmp")"
 	phone_mask="$(get_value _hdnSelectedMaskNum "$tmp")"
 
-	case "$GCFCU_CODE_METHOD" in
+	case "${opt_method:-$GCFCU_CODE_METHOD}" in
 		phone) sec_code_phone; return $?;;
 		text) sec_code_text; return $?;;
 		*)
@@ -323,7 +325,7 @@ transactions() {
 	viewstate="$(get_value __VIEWSTATE "$tmp")"
 	eventval="$(get_value __EVENTVALIDATION "$tmp")"
 
-	acct=7171
+	acct="${opt_account:-$GCFCU_ACCOUNT}"
 	req "/AcctTransDownload.aspx" \
 		--data-urlencode "__VIEWSTATE=$viewstate" \
 		--data-urlencode "__EVENTVALIDATION=$eventval" \
@@ -338,19 +340,26 @@ transactions() {
 }
 
 main() {
-	local args=
-	local cmd=
+	local args= cmd= state=
 	for arg; do
-		case "$arg" in
-			-v|--verbose) opt_verbose=1;;
-			-n|--no-cache) opt_nocache=1;;
-			-r|--raw) opt_raw=1;;
-			-h|--help) opt_help=1;;
-			*)
-				if test -z "$cmd"
-				then cmd="$arg"
-				else args="$args $arg"
-				fi
+		case $state in
+			'')
+				case "$arg" in
+					-v|--verbose) opt_verbose=1;;
+					-n|--no-cache) opt_nocache=1;;
+					-r|--raw) opt_raw=1;;
+					-h|--help) opt_help=1;;
+					-m|--method) state=method;;
+					-a|--account) state=account;;
+					*)
+						if test -z "$cmd"
+						then cmd="$arg"
+						else args="$args $arg"
+						fi
+				esac
+				;;
+			account) opt_account="$arg"; state=;;
+			method) opt_method="$arg"; state=;;
 		esac
 	done
 	set -- $args
