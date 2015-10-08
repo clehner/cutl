@@ -9,7 +9,6 @@ opt_nocache=
 opt_raw=
 opt_help=
 opt_method=
-opt_account=
 
 tmp=
 viewstate=
@@ -352,19 +351,20 @@ tsv_to_ledger() {
 }
 
 transactions() {
-	local format tmp viewopt eventval acct period
-	local opt= opt_format= begin= end= postprocess= atype=1
+	local format tmp viewopt eventval period
+	local opt= opt_format= begin= end= account= postprocess= atype=1 delim=TAB
 
 	for arg; do
 		case $opt in
 			'')
 				case "$arg" in
+					-a|--account) opt=account;;
 					-f|--format) opt=format;;
 					-b|--begin) opt=begin;;
 					-e|--end) opt=end;;
 					-t|--type) opt=type;;
 					-c|--current) period=0;;
-					-a|--all) period=1;;
+					-A|--all) period=1;;
 					-y|--yesterday) period=3;;
 					--deposits) atype=2;;
 					--checks) atype=3;;
@@ -376,6 +376,7 @@ transactions() {
 					*) echo "Unknown argument $arg" >&2; return 1;;
 				esac
 				;;
+			account) account="$arg"; opt=;;
 			format) opt_format="$arg"; opt=;;
 			begin) begin="$arg"; opt=;;
 			end) end="$arg"; opt=;;
@@ -404,11 +405,17 @@ transactions() {
 		*) echo "Unknown format $opt_format" >&2; return 1;;
 	esac
 
+	if test -z "$account" -a "$format" != TEXT; then
+		echo 'Only text format can be used when requesting' \
+			'transactions of multiple accounts' >&2
+		return 1
+	fi
+
 	# Ensure begin and end date are both set if one is set
 	case "$period-$begin-$end" in
 		-*/*/*-*/*/*) period=2; break;;
-		--*) period=2; begin="$(date +'%m/%d/%Y')";;
-		-*-) period=2; end="$(date +'%m/%d/%Y')";;
+		--*?) period=2; begin="$(date +'%m/%d/%Y')";;
+		-*?-) period=2; end="$(date +'%m/%d/%Y')";;
 		?--) break;;
 		*) echo 'Date range conflicts with other date range options' >&2;;
 	esac
@@ -416,26 +423,55 @@ transactions() {
 	tmp="$(mktemp)"
 	trap "rm '$tmp'" 0
 
+	if test -n "$account"
+	then transactions_single
+	else transactions_multi
+	fi | case "$postprocess" in
+		ledger) tsv_to_ledger;;
+		*) cat;;
+	esac
+}
+
+# Get transactions for one account
+transactions_single() {
 	req_cached >"$tmp" "/AcctTransDownload.aspx"
 	viewstate="$(get_value __VIEWSTATE "$tmp")"
 	eventval="$(get_value __EVENTVALIDATION "$tmp")"
 
-	acct="${opt_account:-$GCFCU_ACCOUNT}"
 	req_try "/AcctTransDownload.aspx" \
 		--data-urlencode "__VIEWSTATE=$viewstate" \
 		--data-urlencode "__EVENTVALIDATION=$eventval" \
-		-d "_ctl0%3APageWorkSpace%3AddlAccount=$acct" \
+		-d "_ctl0%3APageWorkSpace%3AddlAccount=$account" \
 		-d "_ctl0%3APageWorkSpace%3AddlTimePeriod=$period" \
 		-d "_ctl0%3APageWorkSpace%3AinpStartDate=$begin" \
 		-d "_ctl0%3APageWorkSpace%3AinpEndDate=$end" \
 		-d "_ctl0%3APageWorkSpace%3AddlActivity=$atype" \
 		-d "_ctl0%3APageWorkSpace%3AddlFileType=$format" \
-		-d "_ctl0%3APageWorkSpace%3AddlDelimiter=TAB" \
-		-d "_ctl0%3APageWorkSpace%3AbtnDownLoadTransactions=" | \
-		case "$postprocess" in
-			ledger) tsv_to_ledger;;
-			*) cat;;
-		esac
+		-d "_ctl0%3APageWorkSpace%3AddlDelimiter=$delim" \
+		-d "_ctl0%3APageWorkSpace%3AbtnDownLoadTransactions="
+}
+
+# Get transactions for all accounts
+transactions_multi() {
+	local checkbox_data
+	req_cached '/AcctTransDownloadMultiAcct.aspx' >"$tmp"
+	viewstate="$(get_value __VIEWSTATE "$tmp")"
+	eventval="$(get_value __EVENTVALIDATION "$tmp")"
+	checkbox_data="$(grep 'gvwAccounts:_ctl' "$tmp" | \
+		sed 's/.*name="\([^"]*\).*/-d \1=on/; s/:/%3A/g')"
+	req_try '/AcctTransDownloadMultiAcct.aspx' \
+		--data-urlencode "__VIEWSTATE=$viewstate" \
+		--data-urlencode "__EVENTVALIDATION=$eventval" \
+		-d '__VIEWSTATEENCRYPTED=' \
+		$checkbox_data \
+		-e "$site_dir/AcctTransDownloadMultiAcct.aspx" \
+		-d "_ctl0%3APageWorkSpace%3AddlTimePeriod=$period" \
+		-d "_ctl0%3APageWorkSpace%3AinpStartDate=$begin" \
+		-d "_ctl0%3APageWorkSpace%3AinpEndDate=$end" \
+		-d "_ctl0%3APageWorkSpace%3AddlActivity=$atype" \
+		-d "_ctl0%3APageWorkSpace%3AddlFileType=$format" \
+		-d "_ctl0%3APageWorkSpace%3AddlDelimiter=$delim" \
+		-d "_ctl0%3APageWorkSpace%3AbtnDownLoadTransactions="
 }
 
 accounts_overview() {
@@ -475,7 +511,6 @@ main() {
 					-r|--raw) opt_raw=1;;
 					-h|--help) opt_help=1;;
 					-m|--method) opt=method;;
-					-a|--account) opt=account;;
 					*)
 						if test -z "$cmd"
 						then cmd="$arg"
@@ -483,7 +518,6 @@ main() {
 						fi
 				esac
 				;;
-			account) opt_account="$arg"; opt=;;
 			method) opt_method="$arg"; opt=;;
 		esac
 	done
