@@ -1,5 +1,4 @@
 #!/bin/sh
-#set -x
 
 site_base=https://secure.cuaccount-access.com/
 cache_dir_checked=
@@ -54,6 +53,11 @@ get_value() {
 	sed -e "/$1/!d" -e 's/.*value="//; s/".*//; q' $2
 }
 
+# Output a log/debug message
+log() {
+	test -n "$opt_verbose" && echo $@
+} >&2
+
 # Empty the cache
 clean_cache() {
 	rm -rf "$cache_dir"
@@ -63,7 +67,7 @@ clean_cache() {
 req() {
 	local url="$site_dir$1"
 	shift
-	test -n "$opt_verbose" && echo req $url >&2
+	log req $url
 	curl -s -b "$cookie_jar" -c "$cookie_jar" "$url" $@
 }
 
@@ -136,10 +140,10 @@ signin() {
 		-d "_ctl0%3APageWorkSpace%3AbtnSignin=Sign+on" \
 		-d "_ctl0%3APageWorkSpace%3AtxtPassword=$password"
 	if grep 'Object moved to.*Login\.aspx' "$tmp"; then
-		echo retrying login
+		log retrying login
 		signin || return $?
 	elif grep -q 'Object moved to <a.*Web_Bank.aspx' "$tmp"; then
-		echo login success
+		log login success
 	fi
 } >&2
 
@@ -466,6 +470,7 @@ main() {
 			'')
 				case "$arg" in
 					-v|--verbose) opt_verbose=1;;
+					-vv) opt_verbose=1; set -x;;
 					-n|--no-cache) opt_nocache=1;;
 					-r|--raw) opt_raw=1;;
 					-h|--help) opt_help=1;;
