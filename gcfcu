@@ -316,8 +316,64 @@ foo() {
 	#cp "$tmp" "login-redir.html"
 }
 
+# Format transactions in ledger(1) format
+tsv_to_ledger() {
+	awk -F '	' '
+	{
+		sub(/\s*$/, "", $7)
+		sub(/T.*/, "", $2)
+		gsub(/-/, "/", $2)
+	}
+	$5 {
+		sub(" #" $5 "$", "", $7)
+		$7="(#" $5 ") " $7
+	}
+	$3 == "Credit" {
+		account_to = "Assets"
+		account_from = "Income"
+	}
+	$3 == "Debit" || $3 == "Checks Paid" {
+		account_to = "Expenses"
+		account_from = "Assets"
+	}
+	$7 ~ / - / {
+		sub(/(ACH Withdrawal|Debit Card\/ACH Point of Sale) - /, "", $7);
+	}
+	{
+		print $2, $7
+		printf "    %-36s  %10s\n", account_to, "$" $6
+		printf "    %s\n\n", account_from
+	}
+	'
+}
+
 transactions() {
-	local tmp viewstate eventval acct
+	local state= opt_format= format tmp viewstate eventval acct postprocess=
+
+	for arg; do
+		case $state in
+			'')
+				case "$arg" in
+					-f|--format) state=format;;
+					*) echo "Unknown argument $arg" >&2;;
+				esac
+				;;
+			format) opt_format="$arg"; state=;;
+		esac
+	done
+
+	case "${opt_format:-$GCFCU_TRANSACTION_FORMAT}" in
+		''|text|TEXT) format=TEXT;;
+		ledger) format=TEXT; postprocess=ledger;;
+		iif|IIF) format=IIF;;
+		qfx|QFX) format=QFX;;
+		qbo|QBO) format=QBO;;
+		bai2|BAI2) format=BAI2;;
+		xls|XLS) format=XLS;;
+		qif|QIF) format=QIF;;
+		*) echo "Unknown format $opt_format" >&2; return 1;;
+	esac
+
 	tmp="$(mktemp)"
 	trap "rm '$tmp'" 0
 
@@ -334,9 +390,13 @@ transactions() {
 		-d "_ctl0%3APageWorkSpace%3AinpStartDate=" \
 		-d "_ctl0%3APageWorkSpace%3AinpEndDate=" \
 		-d "_ctl0%3APageWorkSpace%3AddlActivity=1" \
-		-d "_ctl0%3APageWorkSpace%3AddlFileType=TEXT" \
+		-d "_ctl0%3APageWorkSpace%3AddlFileType=$format" \
 		-d "_ctl0%3APageWorkSpace%3AddlDelimiter=TAB" \
-		-d "_ctl0%3APageWorkSpace%3AbtnDownLoadTransactions="
+		-d "_ctl0%3APageWorkSpace%3AbtnDownLoadTransactions=" | \
+		case "$postprocess" in
+			ledger) tsv_to_ledger;;
+			*) cat;;
+		esac
 }
 
 main() {
@@ -366,7 +426,7 @@ main() {
 	case "$cmd" in
 		'') foo;;
 		signin) signin;;
-		transactions) transactions;;
+		transactions) transactions $@;;
 		clean-cache) clean_cache $@;;
 	esac
 }
