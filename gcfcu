@@ -383,6 +383,7 @@ transactions() {
 					-b|--begin) opt=begin;;
 					-e|--end) opt=end;;
 					-t|--type) opt=type;;
+					-d|--delimiter) opt=delim;;
 					-c|--current) period=0;;
 					-A|--all) period=1;;
 					-y|--yesterday) period=3;;
@@ -400,6 +401,15 @@ transactions() {
 			format) opt_format="$arg"; opt=;;
 			begin) begin="$arg"; opt=;;
 			end) end="$arg"; opt=;;
+			delim)
+				case "$arg" in
+					'	'|tab|TAB) delim=TAB;;
+					' '|space|SPACE) delim=SPACE;;
+					,|comma|COMMA) delim=COMMA;;
+					*) echo "Unknown delimiter type $arg" >&2; return 1;;
+				esac
+				opt=
+				;;
 			type)
 				case "$arg" in
 					all) atype=1;;
