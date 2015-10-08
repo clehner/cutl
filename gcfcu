@@ -3,6 +3,7 @@
 site_base=https://secure.cuaccount-access.com/
 cache_dir_checked=
 cookie_jar_checked=
+bin=${0##*/}
 
 opt_verbose=
 opt_nocache=
@@ -363,6 +364,29 @@ tsv_to_ledger() {
 }
 
 transactions() {
+	if test -n "$opt_help"; then
+		cat <<EOF
+Usage: $bin transactions [options]"
+
+Get a listing of transactions in one or all accounts.
+
+Options:
+    -a --account ACCOUNT    Account to query, or all if omitted
+    -f --format FORMAT      Data format: text|xls|qfx|qif|qbo|iif|bai2|ledger
+    -d --delimiter DELIM    Delimiter for text format: tab|space|comma
+    -t --type TYPE          Transaction type (default is all):
+                                all|deposits|checks|withdrawals
+Date range options:
+    -A --all                All time
+    -c --current            Current statement
+    -y --yesterday          Yesterday only
+    -30 -45 -60 -90         Last N days
+    -b --begin MM/DD/YYYY   Start date (use with --end)
+    -e --end MM/DD/YYYY     End date (use with --begin)
+EOF
+        return 0
+    fi
+
 	local format tmp viewopt eventval period
 	local opt= opt_format= begin= end= account= postprocess= atype=1 delim=TAB
 
@@ -498,6 +522,19 @@ transactions_multi() {
 }
 
 accounts_overview() {
+	if test -n "$opt_help"; then
+		cat <<EOF
+Usage: $bin accounts [options]"
+
+List accounts and other details. Output a header with the account-holder's
+name and sign-on activity, followed by TSV of current accounts.
+
+Options:
+    -H --no-header          Omit the header. Useful for scripting
+EOF
+        return 0
+    fi
+
 	local opt_no_header= header_sed=
 	for arg; do
 		case "$arg" in
@@ -506,10 +543,12 @@ accounts_overview() {
 		esac
 	done
 	if test -z "$opt_no_header"; then
+		# Print a header with name, signin details
 		header_sed='/lblWelcomeMsg/ {
 			s/.*>Welcome \([^,]*\) *,.*last time you signed on was \([^.]*\).*last failed sign on was \([^.]*\).*/Name: \1\nLast sign on: \2\nLast failed sign on: \3\n/
 			p
 		}
+		# Print a header of TSV values
 		/<thead>/ {
 			s/.*/ID	Account Name	Number	Available Balance	Current Balance/
 			p
@@ -520,6 +559,25 @@ accounts_overview() {
 	$header_sed
 	/AcctDetail/!d
 	s/.*<a[^>]*id=\([0-9a-z-]*\).>\([^<]*\).*<a[^>]*>\([^<]*\).*<span>\([^<]*\).*<span>\([^<]*\).*/\1	\2	\3	\4	\5/"
+}
+
+bare() {
+	cat <<EOF
+Usage: $bin <command> [options]"
+
+Access a credit union account
+
+Commands:
+    transactions            Get account transactions
+    accounts                Get info about accounts
+
+Options:
+    -h --help               Get info about a command
+    -v --verbose            Output feedback as a command is executing
+    -vv                     Output more debug info
+    -n --no-cache           Skip cached command responses
+    -m --method METHOD      Account login verification method: text or phone
+EOF
 }
 
 main() {
@@ -545,8 +603,7 @@ main() {
 	done
 	set -- $args
 	case "$cmd" in
-		'') foo;;
-		signin) signin;;
+		'') bare;;
 		accounts) accounts_overview $@;;
 		transactions) transactions $@;;
 		clean-cache) clean_cache $@;;
