@@ -111,7 +111,7 @@ signin() {
 	if grep -q 'Continue with Security Code' "$tmp"; then
 		signin_sec
 	elif ! grep -q 'PassMark Recognized' "$tmp"; then
-		echo 'Signin error' >&2
+		echo 'Signin error'
 		return 1
 	fi
 
@@ -131,12 +131,12 @@ signin() {
 		-d "_ctl0%3APageWorkSpace%3AbtnSignin=Sign+on" \
 		-d "_ctl0%3APageWorkSpace%3AtxtPassword=$password"
 	if grep 'Object moved to.*Login\.aspx' "$tmp"; then
-		echo retrying login >&2
+		echo retrying login
 		signin || return $?
 	elif grep -q 'Object moved to <a.*Web_Bank.aspx' "$tmp"; then
-		echo login success >&2
+		echo login success
 	fi
-}
+} >&2
 
 signin_sec() {
 	req >"$tmp" '/SignOn.aspx' \
@@ -145,19 +145,19 @@ signin_sec() {
 		--data-urlencode "__EVENTVALIDATION=$eventval" \
 		-d "_ctl0%3APageWorkSpace%3ASecurityCodeImage1%3AbtnContinueSecurityCode=Continue+with+Security+Code"
 	if grep -q 'Processing Error' "$tmp"; then
-		echo Error >&2
+		echo Error
 		return 1
 	fi
 
 	oob="$(grep OOBChallenge "$tmp" | sed "s/.*OOBChallenge\.aspx//; s/'.*//")"
 	if test -z "$oob"; then
-		echo 'Unable to get OOBChallenge' >&2
+		echo 'Unable to get OOBChallenge'
 		return 1
 	fi
 
 	req >"$tmp" "/OOBChallenge.aspx$oob"
 	if ! grep -q 'Tell us where to reach you' "$tmp"; then
-		echo 'Missing OOB challenge' >&2
+		echo 'Missing OOB challenge'
 		return 1
 	fi
 
@@ -204,7 +204,7 @@ sec_code_text() {
 
 	req >"$tmp" "/OOBChallengeText.aspx$oob"
 	if ! grep -q 'Enter your mobile phone number' "$tmp"; then
-		echo 'Unable to get to mobile phone number prompt' >&2
+		echo 'Unable to get to mobile phone number prompt'
 		return 1
 	fi
 	viewstate="$(get_value __VIEWSTATE "$tmp")"
@@ -244,7 +244,7 @@ sec_code_text() {
 		--trace-ascii text3-trace
 	cp $tmp text3.html
 	if grep -q 'Processing Error' "$tmp"; then
-		echo Error >&2
+		echo Error
 		return 1
 	fi
 
@@ -266,13 +266,13 @@ sec_code_phone() {
 	oob="$(grep OOBVerification "$tmp" | \
 		sed "s/.*OOBVerification\.aspx//; s/'.*//")"
 	if test -z "$oob"; then
-		echo 'Unable to get OOBVerification' >&2
+		echo 'Unable to get OOBVerification'
 		return 1
 	fi
 
 	req >"$tmp" "/OOBVerification.aspx$oob"
 	if ! grep -q 'Enter the security code' "$tmp"; then
-		echo 'Unable to get to security code prompt' >&2
+		echo 'Unable to get to security code prompt'
 		return 1
 	fi
 
