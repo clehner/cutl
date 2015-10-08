@@ -321,26 +321,46 @@ foo() {
 
 # Format transactions in ledger(1) format
 tsv_to_ledger() {
-	awk -F '	' '
+	{
+		accounts_overview -H
+		echo
+		cat
+	} | awk -F '	' '
+	!body && /^$/ {
+		body = 1
+		next
+	}
+	!body {
+		account_names[$3] = $2
+		next
+	}
 	{
 		sub(/\s*$/, "", $7)
 		sub(/T.*/, "", $2)
 		gsub(/-/, "/", $2)
+		assets_account = $1
+	}
+	$1 in account_names {
+		assets_account = account_names[$1]
 	}
 	$5 {
 		sub(" #" $5 "$", "", $7)
 		$7="(#" $5 ") " $7
 	}
 	$3 == "Credit" {
-		account_to = "Assets"
+		account_to = "Assets:" assets_account
 		account_from = "Income"
 	}
 	$3 == "Debit" || $3 == "Checks Paid" {
 		account_to = "Expenses"
-		account_from = "Assets"
+		account_from = "Assets:" assets_account
 	}
 	$7 ~ / - / {
-		sub(/(ACH Withdrawal|Debit Card\/ACH Point of Sale) - /, "", $7);
+		sub(/(ACH Withdrawal|Debit Card\/ACH Point of Sale) - /, "", $7)
+	}
+	$7 ~ /^Dividend - / {
+		sub(/Dividend - /, "", $7)
+		account_from = "Income:Dividends"
 	}
 	{
 		print $2, $7
