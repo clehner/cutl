@@ -69,7 +69,7 @@ req_cached() {
 	then cat "$cache_file"
 	else
 		trap "rm $cache_file" 1 2 15
-		req $@ | tee "$cache_file"
+		req_try $@ | tee "$cache_file"
 	fi
 }
 
@@ -316,12 +316,12 @@ transactions() {
 	tmp="$(mktemp)"
 	trap "rm '$tmp'" 0
 
-	req_try >"$tmp" "/AcctTransDownload.aspx"
+	req_cached >"$tmp" "/AcctTransDownload.aspx"
 	viewstate="$(get_value __VIEWSTATE "$tmp")"
 	eventval="$(get_value __EVENTVALIDATION "$tmp")"
 
 	acct=7171
-	req_try "/AcctTransDownload.aspx" \
+	req "/AcctTransDownload.aspx" \
 		--data-urlencode "__VIEWSTATE=$viewstate" \
 		--data-urlencode "__EVENTVALIDATION=$eventval" \
 		-d "_ctl0%3APageWorkSpace%3AddlAccount=$acct" \
@@ -331,7 +331,7 @@ transactions() {
 		-d "_ctl0%3APageWorkSpace%3AddlActivity=1" \
 		-d "_ctl0%3APageWorkSpace%3AddlFileType=TEXT" \
 		-d "_ctl0%3APageWorkSpace%3AddlDelimiter=TAB" \
-		-d "_ctl0%3APageWorkSpace%3AbtnDownLoadTransactions=Download transactions"
+		-d "_ctl0%3APageWorkSpace%3AbtnDownLoadTransactions="
 }
 
 main() {
