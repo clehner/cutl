@@ -348,17 +348,29 @@ tsv_to_ledger() {
 }
 
 transactions() {
-	local state= opt_format= format tmp viewstate eventval acct postprocess=
+	local format tmp viewstate eventval acct period
+	local state= opt_format= begin= end= postprocess=
 
 	for arg; do
 		case $state in
 			'')
 				case "$arg" in
 					-f|--format) state=format;;
-					*) echo "Unknown argument $arg" >&2;;
+					-b|--begin) state=begin;;
+					-e|--end) state=end;;
+					-c|--current) period=0;;
+					-a|--all) period=1;;
+					-y|--yesterday) period=3;;
+					-30) period=4;;
+					-45) period=5;;
+					-60) period=6;;
+					-90) period=7;;
+					*) echo "Unknown argument $arg" >&2; return 1;;
 				esac
 				;;
 			format) opt_format="$arg"; state=;;
+			begin) begin="$arg"; state=;;
+			end) end="$arg"; state=;;
 		esac
 	done
 
@@ -374,6 +386,15 @@ transactions() {
 		*) echo "Unknown format $opt_format" >&2; return 1;;
 	esac
 
+	# Ensure begin and end date are both set if one is set
+	case "$period-$begin-$end" in
+		-*/*/*-*/*/*) period=2; break;;
+		--*) period=2; begin="$(date +'%m/%d/%Y')";;
+		-*-) period=2; end="$(date +'%m/%d/%Y')";;
+		?--) break;;
+		*) echo 'Date range conflicts with other date range options' >&2;;
+	esac
+
 	tmp="$(mktemp)"
 	trap "rm '$tmp'" 0
 
@@ -386,9 +407,9 @@ transactions() {
 		--data-urlencode "__VIEWSTATE=$viewstate" \
 		--data-urlencode "__EVENTVALIDATION=$eventval" \
 		-d "_ctl0%3APageWorkSpace%3AddlAccount=$acct" \
-		-d "_ctl0%3APageWorkSpace%3AddlTimePeriod=1" \
-		-d "_ctl0%3APageWorkSpace%3AinpStartDate=" \
-		-d "_ctl0%3APageWorkSpace%3AinpEndDate=" \
+		-d "_ctl0%3APageWorkSpace%3AddlTimePeriod=$period" \
+		-d "_ctl0%3APageWorkSpace%3AinpStartDate=$begin" \
+		-d "_ctl0%3APageWorkSpace%3AinpEndDate=$end" \
 		-d "_ctl0%3APageWorkSpace%3AddlActivity=1" \
 		-d "_ctl0%3APageWorkSpace%3AddlFileType=$format" \
 		-d "_ctl0%3APageWorkSpace%3AddlDelimiter=TAB" \
