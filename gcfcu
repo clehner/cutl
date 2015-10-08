@@ -13,6 +13,10 @@ opt_nocache=
 opt_raw=
 opt_help=
 
+tmp=
+viewstate=
+eventval=
+
 test -e "$rcfile" && . "$rcfile"
 
 # Check if a file is accessible to other users
@@ -69,8 +73,21 @@ req_cached() {
 	fi
 }
 
+# Make a request, and try to log in if needed
+req_try() {
+	req $@ -i | awk '
+		body==1 { print; next }
+		/^Location:.*[lL]ogin/ { exit 99 }
+		length($0) == 1 { body=1 }'
+	case $? in
+		99)
+			# Log in and retry the request
+			signin && req_try $@
+	esac
+}
+
 signin() {
-	local username password viewstate eventval tmp oob resp
+	local username password tmp oob resp qs
 	tmp="$(mktemp)"
 	trap "rm '$tmp'" 0
 	req '/' > "$tmp"
@@ -82,6 +99,22 @@ signin() {
 	else read -rp 'Username: ' username
 	fi
 
+	req >"$tmp" '/login.aspx' -L -e "$site_base" \
+		--data-urlencode "txtUsername=$username" \
+		--data-urlencode "__EVENTVALIDATION=$eventval" \
+		--data-urlencode "__EVENTTARGET=cmdLogin" \
+		--data-urlencode "__VIEWSTATE=$viewstate"
+
+	viewstate="$(get_value __VIEWSTATE "$tmp")"
+	eventval="$(get_value __EVENTVALIDATION "$tmp")"
+
+	if grep -q 'Continue with Security Code' "$tmp"; then
+		signin_sec
+	elif ! grep -q 'PassMark Recognized' "$tmp"; then
+		echo 'Signin error' >&2
+		return 1
+	fi
+
 	if test -n "$GCFCU_PASSWORD"
 	then password="$GCFCU_PASSWORD"
 	elif test -n "$GCFCU_PASSCMD"
@@ -89,21 +122,23 @@ signin() {
 	else stty -echo; read -rp 'Passphrase: ' password; echo >&2; stty echo
 	fi
 
-	req >"$tmp" '/login.aspx' -L -e "$site_base" \
-		--data-urlencode "txtUsername=$username" \
+	qs="$(grep PassMarkRecognizedAdv "$tmp" | \
+		sed 's/.*PassMarkRecognizedAdv\.aspx//; s/".*//; q')"
+	req >"$tmp" "/PassMarkRecognizedAdv.aspx$qs" \
+		-e "$site_base" \
 		--data-urlencode "__EVENTVALIDATION=$eventval" \
-		--data-urlencode "__EVENTTARGET=cmdLogin" \
-		--data-urlencode "__VIEWSTATE=$viewstate"
-
-	if ! grep -q "Continue with Security Code" "$tmp"; then
-		echo Security code not asked for. See /tmp/gcfcu-out.html
-		cp "$tmp" /tmp/gcfcu-out.html
-		return 1
+		--data-urlencode "__VIEWSTATE=$viewstate" \
+		-d "_ctl0%3APageWorkSpace%3AbtnSignin=Sign+on" \
+		-d "_ctl0%3APageWorkSpace%3AtxtPassword=$password"
+	if grep 'Object moved to.*Login\.aspx' "$tmp"; then
+		echo retrying login >&2
+		signin || return $?
+	elif grep -q 'Object moved to <a.*Web_Bank.aspx' "$tmp"; then
+		echo login success >&2
 	fi
+}
 
-	viewstate="$(get_value __VIEWSTATE "$tmp")"
-	eventval="$(get_value __EVENTVALIDATION "$tmp")"
-
+signin_sec() {
 	req >"$tmp" '/SignOn.aspx' \
 		-e "$site_base" \
 		--data-urlencode "__VIEWSTATE=$viewstate" \
@@ -130,22 +165,29 @@ signin() {
 	eventval="$(get_value __EVENTVALIDATION "$tmp")"
 	phone_mask="$(get_value _hdnSelectedMaskNum "$tmp")"
 
-	echo 'Receive One-Time Security Code by:'
-	echo "[p]hone ($phone_mask)"
-	echo "[t]ext message"
-	sec_code_text "$oob"; return $?; ##
-	while true; do
-		read -p '? ' resp
-		case "$resp" in
-			p) sec_code_phone "$oob"; return $?;;
-			t) sec_code_text "$oob"; return $?;;
-		esac
-	done
+	case "$GCFCU_CODE_METHOD" in
+		phone) sec_code_phone; return $?;;
+		text) sec_code_text; return $?;;
+		*)
+			echo 'Receive One-Time Security Code by:'
+			echo "[p]hone ($phone_mask)"
+			echo "[t]ext message"
+			while true; do
+				read -p '? ' resp
+				case "$resp" in
+					p) sec_code_phone; return $?;;
+					t) sec_code_text; return $?;;
+				esac
+			done
+	esac
+
+	#get
+	#/PassMarkRecognizedAdv.aspx?qs=b2TU7c2wr8E0dfptJiVc6osqODJNVVaa6UZusUsRdZI%3d
 }
 
 # Receive one-time security code from user by text message
 sec_code_text() {
-	local oob="$1" locale num_1= num_2= num_3= num_country= num_int= resp
+	local oob locale num_1= num_2= num_3= num_country= num_int= resp
 	req >"$tmp" "/OOBChallenge.aspx" \
 		-e "$site_base" \
 		--data-urlencode "__EVENTVALIDATION=$eventval" \
@@ -198,16 +240,98 @@ sec_code_text() {
 		-d "_ctl0%3APageWorkSpace%3AtxtNumber3=$num_3" \
 		-d "_ctl0%3APageWorkSpace%3AtxtCountryCode=$num_country" \
 		-d "_ctl0%3APageWorkSpace%3AtxtIntNum=$num_int" \
-		-d "_ctl0%3APageWorkSpace%3AbtnSendMessage=Send+text+message"
+		-d "_ctl0%3APageWorkSpace%3AbtnSendMessage=Send+text+message" \
+		--trace-ascii text3-trace
+	cp $tmp text3.html
 	if grep -q 'Processing Error' "$tmp"; then
 		echo Error >&2
 		return 1
 	fi
+
+	#qs
+	#-d "_ctl0%3APageWorkSpace%3AtxtSMSCode=$code"
+	#-d "_ctl0%3APageWorkSpace%3AbtnSubmit=Submit
 }
 
 # Receive one-time security code from user by phone
 sec_code_phone() {
-	false
+	local oob code resp
+	req >"$tmp" "/OOBChallenge.aspx" \
+		-e "$site_base" \
+		--data-urlencode "__EVENTVALIDATION=$eventval" \
+		--data-urlencode "__VIEWSTATE=$viewstate" \
+		-d "_ctl0%3APageWorkSpace%3AhdnSelectedNum=1" \
+		-d "_ctl0%3APageWorkSpace%3AbtnContinue=Continue"
+
+	oob="$(grep OOBVerification "$tmp" | \
+		sed "s/.*OOBVerification\.aspx//; s/'.*//")"
+	if test -z "$oob"; then
+		echo 'Unable to get OOBVerification' >&2
+		return 1
+	fi
+
+	req >"$tmp" "/OOBVerification.aspx$oob"
+	if ! grep -q 'Enter the security code' "$tmp"; then
+		echo 'Unable to get to security code prompt' >&2
+		return 1
+	fi
+
+	viewstate="$(get_value __VIEWSTATE "$tmp")"
+	eventval="$(get_value __EVENTVALIDATION "$tmp")"
+	code="$(sed '/lblVoiceCode"/!d; s/.*<font[^>]*>//; s/<.*//; q' "$tmp")"
+	echo "One-time security code: $code"
+	echo 'The phone call is underway. Press enter when the call is complete.'
+	read _
+
+	req >"$tmp" "/OOBVerification.aspx$oob" \
+		-e "$site_base" \
+		--data-urlencode "__EVENTVALIDATION=$eventval" \
+		--data-urlencode "__VIEWSTATE=$viewstate" \
+		-d "_ctl0%3APageWorkSpace%3AbtnCallCompleted=Phone+call+completed"
+	if grep -q "<script>.*OOBError" "$tmp" || \
+		grep -q "LoginAdv\.aspx?error=true&msg=1315" "$tmp"
+	then
+		echo 'There was an error'
+		read -p 'Try again? [Y/n]' resp
+		if test "$resp" != 'n'; then
+			sec_code_phone
+			return $?
+		else
+			return 1
+		fi
+	fi
+
+	# TODO: implement btnCancel=Cancel
+}
+
+foo() {
+	local tmp="$(mktemp)"
+	trap "rm '$tmp'" 0
+	#req >"$tmp" "/SignOn.aspx?qs=XuuRl08sxXM%3d" -L
+	#cp "$tmp" "login-redir.html"
+}
+
+transactions() {
+	local tmp viewstate eventval acct
+	tmp="$(mktemp)"
+	trap "rm '$tmp'" 0
+
+	req_try >"$tmp" "/AcctTransDownload.aspx"
+	viewstate="$(get_value __VIEWSTATE "$tmp")"
+	eventval="$(get_value __EVENTVALIDATION "$tmp")"
+
+	acct=7171
+	req_try "/AcctTransDownload.aspx" \
+		--data-urlencode "__VIEWSTATE=$viewstate" \
+		--data-urlencode "__EVENTVALIDATION=$eventval" \
+		-d "_ctl0%3APageWorkSpace%3AddlAccount=$acct" \
+		-d "_ctl0%3APageWorkSpace%3AddlTimePeriod=1" \
+		-d "_ctl0%3APageWorkSpace%3AinpStartDate=" \
+		-d "_ctl0%3APageWorkSpace%3AinpEndDate=" \
+		-d "_ctl0%3APageWorkSpace%3AddlActivity=1" \
+		-d "_ctl0%3APageWorkSpace%3AddlFileType=TEXT" \
+		-d "_ctl0%3APageWorkSpace%3AddlDelimiter=TAB" \
+		-d "_ctl0%3APageWorkSpace%3AbtnDownLoadTransactions=Download transactions"
 }
 
 main() {
@@ -228,7 +352,9 @@ main() {
 	done
 	set -- $args
 	case "$cmd" in
-		'') signin;;
+		'') foo;;
+		signin) signin;;
+		transactions) transactions;;
 		clean-cache) clean_cache $@;;
 	esac
 }
