@@ -2,7 +2,6 @@
 #set -x
 
 site_base=https://secure.cuaccount-access.com/
-cache_dir="/tmp/gcfcu-$USER"
 cache_dir_checked=
 cookie_jar_checked=
 
@@ -23,6 +22,7 @@ test -f "${GCFCU_CONFIG_FILE:="${XDG_CONFIG_HOME:-~/.config}/gcfcurc"}" &&
 cu_name=${GCFCU_CU_NAME:-GeneseeCoopFCU}
 site_dir=${GCFCU_CU_SITE:-$site_base$cu_name}
 cookie_jar=${GCFCU_COOKIEJAR:-~/.gcfcu_cookies.txt}
+cache_dir="${GCFCU_CACHE_DIR:-/tmp/gcfcu-$LOGNAME}"
 
 # Check if a file is accessible to other users
 insecure_file() {
