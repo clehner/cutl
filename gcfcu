@@ -372,17 +372,21 @@ Get a listing of transactions in one or all accounts.
 
 Options:
     -a --account ACCOUNT    Account to query, or all if omitted
-    -f --format FORMAT      Data format: text|xls|qfx|qif|qbo|iif|bai2|ledger
-    -d --delimiter DELIM    Delimiter for text format: tab|space|comma
+    -f --format FORMAT      Data format (default is text):
+                                text|xls|qfx|qif|qbo|iif|bai2|ledger
+    -d --delimiter DELIM    Delimiter for text format (default is tab):
+                                tab|space|comma
     -t --type TYPE          Transaction type (default is all):
                                 all|deposits|checks|withdrawals
 Date range options:
     -A --all                All time
-    -c --current            Current statement
+    -c --current            Current statement (default)
     -y --yesterday          Yesterday only
     -30 -45 -60 -90         Last N days
-    -b --begin MM/DD/YYYY   Start date (use with --end)
-    -e --end MM/DD/YYYY     End date (use with --begin)
+
+Fixed date range (overrides other date options):
+    -b --begin MM/DD/YYYY   Start date
+    -e --end MM/DD/YYYY     End date
 EOF
         return 0
     fi
