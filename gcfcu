@@ -413,10 +413,11 @@ transactions() {
 
 	# Ensure begin and end date are both set if one is set
 	case "$period-$begin-$end" in
-		-*/*/*-*/*/*) period=2; break;;
+		--) period=0;;
+		-*/*/*-*/*/*) period=2;;
 		--*?) period=2; begin="$(date +'%m/%d/%Y')";;
 		-*?-) period=2; end="$(date +'%m/%d/%Y')";;
-		?--) break;;
+		?--) ;;
 		*) echo 'Date range conflicts with other date range options' >&2;;
 	esac
 
