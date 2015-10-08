@@ -6,7 +6,6 @@ cookie_jar_checked=
 
 opt_verbose=
 opt_nocache=
-opt_raw=
 opt_help=
 opt_method=
 
@@ -76,7 +75,7 @@ req_cached() {
 	if test -z "$opt_nocache" -a -s "$cache_file"
 	then cat "$cache_file"
 	else
-		trap "rm $cache_file" 1 2 15
+		trap "rm -f $cache_file" 1 2 15
 		req_try $@ | tee "$cache_file"
 	fi
 }
@@ -312,13 +311,6 @@ sec_code_phone() {
 	# TODO: implement btnCancel=Cancel
 }
 
-foo() {
-	local tmp="$(mktemp)"
-	trap "rm '$tmp'" 0
-	#req >"$tmp" "/SignOn.aspx?qs=XuuRl08sxXM%3d" -L
-	#cp "$tmp" "login-redir.html"
-}
-
 # Format transactions in ledger(1) format
 tsv_to_ledger() {
 	{
@@ -425,7 +417,7 @@ transactions() {
 
 	case "${opt_format:-$GCFCU_TRANSACTION_FORMAT}" in
 		''|text|TEXT) format=TEXT;;
-		ledger) format=TEXT; postprocess=ledger;;
+		ledger) format=TEXT; delim=TAB; postprocess=ledger;;
 		iif|IIF) format=IIF;;
 		qfx|QFX) format=QFX;;
 		qbo|QBO) format=QBO;;
@@ -539,7 +531,6 @@ main() {
 					-v|--verbose) opt_verbose=1;;
 					-vv) opt_verbose=1; set -x;;
 					-n|--no-cache) opt_nocache=1;;
-					-r|--raw) opt_raw=1;;
 					-h|--help) opt_help=1;;
 					-m|--method) opt=method;;
 					*)
