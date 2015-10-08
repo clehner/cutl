@@ -83,7 +83,7 @@ req_try() {
 	req $@ -i | awk '
 		body==1 { print; next }
 		/^Location:.*[lL]ogin/ { exit 99 }
-		length($0) == 1 { body=1 }'
+		length($0) == 1 && NR > 2 { body=1 }'
 	case $? in
 		99)
 			# Log in and retry the request
@@ -326,7 +326,7 @@ transactions() {
 	eventval="$(get_value __EVENTVALIDATION "$tmp")"
 
 	acct="${opt_account:-$GCFCU_ACCOUNT}"
-	req "/AcctTransDownload.aspx" \
+	req_try "/AcctTransDownload.aspx" \
 		--data-urlencode "__VIEWSTATE=$viewstate" \
 		--data-urlencode "__EVENTVALIDATION=$eventval" \
 		-d "_ctl0%3APageWorkSpace%3AddlAccount=$acct" \
