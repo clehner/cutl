@@ -349,7 +349,7 @@ tsv_to_ledger() {
 
 transactions() {
 	local format tmp viewopt eventval acct period
-	local opt= opt_format= begin= end= postprocess=
+	local opt= opt_format= begin= end= postprocess= atype=1
 
 	for arg; do
 		case $opt in
@@ -358,9 +358,13 @@ transactions() {
 					-f|--format) opt=format;;
 					-b|--begin) opt=begin;;
 					-e|--end) opt=end;;
+					-t|--type) opt=type;;
 					-c|--current) period=0;;
 					-a|--all) period=1;;
 					-y|--yesterday) period=3;;
+					--deposits) atype=2;;
+					--checks) atype=3;;
+					--withdrawals) atype=4;;
 					-30) period=4;;
 					-45) period=5;;
 					-60) period=6;;
@@ -371,6 +375,16 @@ transactions() {
 			format) opt_format="$arg"; opt=;;
 			begin) begin="$arg"; opt=;;
 			end) end="$arg"; opt=;;
+			type)
+				case "$arg" in
+					all) atype=1;;
+					deposits) atype=2;;
+					checks) atype=3;;
+					withdrawals) atype=4;;
+					*) echo "Unknown activity type $arg" >&2; return 1;;
+				esac
+				opt=
+				;;
 		esac
 	done
 
@@ -410,7 +424,7 @@ transactions() {
 		-d "_ctl0%3APageWorkSpace%3AddlTimePeriod=$period" \
 		-d "_ctl0%3APageWorkSpace%3AinpStartDate=$begin" \
 		-d "_ctl0%3APageWorkSpace%3AinpEndDate=$end" \
-		-d "_ctl0%3APageWorkSpace%3AddlActivity=1" \
+		-d "_ctl0%3APageWorkSpace%3AddlActivity=$atype" \
 		-d "_ctl0%3APageWorkSpace%3AddlFileType=$format" \
 		-d "_ctl0%3APageWorkSpace%3AddlDelimiter=TAB" \
 		-d "_ctl0%3APageWorkSpace%3AbtnDownLoadTransactions=" | \
