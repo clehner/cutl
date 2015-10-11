@@ -13,6 +13,20 @@
 .Nm
 is a tool for accessing one's banking data from the credit union website
 .Dq cuaccount-access.com .
+It allows you to log into your account, retrieve account data and transaction
+histories.
+.Pp
+When you run a command that requires logging into your account,
+.Nm
+will prompt you for login details, or you can skip this process by using
+environmental or config variables.
+.Pp
+When
+.Nm
+starts, it reads a config file from under your home directory. In this file you
+can define environmental variables to customize cutl's operation. See the
+.Sx ENVIRONMENT
+section for more details.
 .Sh OPTIONS
 .Bl -tag -compact -width ".Fl \-method Ar method Pq Fl m"
 .It Fl \-help Pq Fl h
@@ -155,9 +169,21 @@ Overridden by
 Directory for storing cached request data. Overridden by
 .Ev CUTL_CACHE_DIR .
 .El
-.Sh CAVEATS
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr ledger 1
+.Xr curl 1
+.Sh BUGS
 Currently, login via
 .Cm text
 method does not work, and login via
 .Cm phone
 method is not fully tested.
+.Sh SECURITY CONSIDERATIONS
+The cookie jar file at
+.Ev $CUTL_COOKIEJAR
+stores session cookies when
+.Nm
+is logged in to the banking server, so it should have be appropriately
+protected.
