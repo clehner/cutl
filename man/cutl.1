@@ -1,5 +1,5 @@
 .Dd 2015-10-10
-.Dt CUTL
+.Dt CUTL 1
 .Os
 .Sh NAME
 .Nm cutl
@@ -11,6 +11,8 @@
 .Ic accounts Op options
 .Sh DESCRIPTION
 .Nm
+is a tool for accessing one's banking data from the credit union website
+.Dq cuaccount-access.com .
 .Sh OPTIONS
 .Bl -tag -compact -width ".Fl \-method Ar method Pq Fl m"
 .It Fl \-help Pq Fl h
@@ -22,45 +24,51 @@ Output more debug info
 .It Fl \-no\-cache Pq Fl n
 Skip cached command responses
 .It Fl \-method Ar method Pq Fl m
-Account login verification method: text or phone
+Account login verification method:
+.Cm text
+or
+.Cm phone
 .El
 .Sh COMMANDS
-.Bl -tag -width "    "
+.Bl -tag -width 2n
 .It Nm accounts Op options
 List accounts and other details. Output a header with the account-holder's
 name and sign-on activity, followed by TSV of current accounts.
 .Pp
+The columns outputed are:
+ID, Account Name, Number, Available Balance, Current Balance.
+.Pp
 .Bl -tag -compact  -width ".Fl \-account Ar account Pq Fl A"
 .It Fl \-no-header Pq Fl H
-Omit the header. Useful for scripting
+Omit the header. Useful for scripting.
 .El
 .It Nm transactions Op options
 Get a listing of transactions in one or all accounts.
 .Pp
-.Bl -tag -compact  -width ".Fl \-account Ar account Pq Fl A"
+.Bl -tag -compact -width ".Fl \-account Ar account Pq Fl A"
 .It Fl \-account Ar account Pq Fl A
 Account to query, or all if omitted
 .It Fl \-format Ar format Pq Fl f
-Data format (default is text):
-text,xls,qfx,qif,qbo,iif,bai2,ledger
+Data format to output (default is text):
+.Cm text | xls | qfx | qif | qbo | iif | bai2 | ledger
 .It Fl \-delimiter Ar delim Pq Fl d
 Delimiter for text format (default is tab):
-tab,space,comma
+.Cm tab | space | comma
 .It Fl \-type Ar type Pq Fl t
 Transaction type (default is all):
-all,deposits,checks,withdrawals
+.Cm all | deposits | checks | withdrawals
 .El
 .Pp
 Date range options:
 .Pp
-.Bl -tag -compact -width ".Fl \-method Ar method Pq Fl m"
+.Bl -tag -compact -width ".Fl 30 | Fl 45 | Fl 60 | Fl 90"
 .It Fl \-all Pq Fl A
 All time
 .It Fl \-current Pq Fl c
 Current statement (default)
 .It Fl \-yesterday Pq Fl y
 Yesterday only
-.It Fl 30 Fl 45 Fl 60 Fl 90
+.It Fl 30 | Fl 45 | Fl 60 | Fl 90
 Last N days
 .El
 .Pp
@@ -73,3 +81,83 @@ Start date
 End date
 .El
 .El
+.Sh ENVIRONMENT
+.Bl -tag -compact -width CUTL_CODE_METHOD
+.It Ev CUTL_CONFIG_FILE
+Path to the
+.Nm
+config file. Default is ~/.config/cutlrc
+.It Ev CUTL_CU_NAME
+The name of the credit union which forms part of the URL.
+Default is GeneseeCoopFCU. Case-insensitive.
+.It Ev CUTL_CU_SITE
+The base URL of the credit union banking site. Default is
+.Lk https://secure.cuaccount-access.com/$CUTL_CU_NAME
+.It Ev CUTL_COOKIEJAR
+File for reading and writing cookies to. Default is ~/.cutl_cookies.txt
+.It Ev CUTL_CACHE_DIR
+Directory in which to store cached requests. Default is /tmp/cutl-$LOGNAME
+.It Ev CUTL_USERNAME
+Username of credit union account. If empty, user is prompted during login.
+.It Ev CUTL_PASSWORD
+Password for credit union account.
+.It Ev CUTL_PASSCMD
+Command to get password for credit union account.
+.Pp
+If
+Ev CUTL_PASSWORD
+and
+Ev CUTL_PASSCMD
+are empty, user is prompted for the password during login.
+.Pp
+.It Ev CUTL_PHONE
+International phone number. Format is country code, followed by space, followed
+by the phone number.
+.It Ev CUTL_PHONE_US
+US/Canada phone number. Format is "XXX XXX XXXX" beginning with area code.
+.Pp
+Either
+.Ev CUTL_PHONE
+or
+.Ev CUTL_PHONE_US
+is used for login verification via text message. If both variables are empty,
+the user is prompted for the phone number during the login process if using
+.Dq text
+login code method.
+.Pp
+.It Ev CUTL_CODE_METHOD
+The login verification method. Value is
+.Dq text
+or
+.Dq phone .
+Overridden by
+.Fl \-method .
+If unset, user is prompted to choose one during login.
+.It Ev CUTL_TRANSACTION_FORMAT
+Default output format for
+.Nm
+.Ic transactions ,
+overridden by
+.Fl \-format .
+Default is
+.Dq text .
+.El
+.Sh FILES
+.Bl -tag -width -indent
+.It Pa ~/.config/cutlrc
+Configuration script, read on start for config variables. Overridden by
+.Ev CUTL_CONFIG_FILE .
+.It Pa ~/.cutl_cookies.txt
+File to store cookies in.
+Overridden by
+.Ev CUTL_COOKIEJAR .
+.It Pa /tmp/cutl-$LOGNAME
+Directory for storing cached request data. Overridden by
+.Ev CUTL_CACHE_DIR .
+.El
+.Sh CAVEATS
+Currently, login via
+.Cm text
+method does not work, and login via
+.Cm phone
+method is not fully tested.
