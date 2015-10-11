@@ -1,0 +1,75 @@
+.Dd 2015-10-10
+.Dt GCFCU
+.Os
+.Sh NAME
+.Nm gcfcu
+.Nd Access credit union banking sites
+.Sh SYNOPSIS
+.Nm
+.Ic transactions Op options
+.Nm
+.Ic accounts Op options
+.Sh DESCRIPTION
+.Nm
+.Sh OPTIONS
+.Bl -tag -compact -width ".Fl \-method Ar method Pq Fl m"
+.It Fl \-help Pq Fl h
+Get info about a command
+.It Fl \-verbose Pq Fl v
+Output feedback as a command is executing
+.It Fl vv
+Output more debug info
+.It Fl \-no\-cache Pq Fl n
+Skip cached command responses
+.It Fl \-method Ar method Pq Fl m
+Account login verification method: text or phone
+.El
+.Sh COMMANDS
+.Bl -tag -width "    "
+.It Nm accounts Op options
+List accounts and other details. Output a header with the account-holder's
+name and sign-on activity, followed by TSV of current accounts.
+.Pp
+.Bl -tag -compact  -width ".Fl \-account Ar account Pq Fl A"
+.It Fl \-no-header Pq Fl H
+Omit the header. Useful for scripting
+.El
+.It Nm transactions Op options
+Get a listing of transactions in one or all accounts.
+.Pp
+.Bl -tag -compact  -width ".Fl \-account Ar account Pq Fl A"
+.It Fl \-account Ar account Pq Fl A
+Account to query, or all if omitted
+.It Fl \-format Ar format Pq Fl f
+Data format (default is text):
+text,xls,qfx,qif,qbo,iif,bai2,ledger
+.It Fl \-delimiter Ar delim Pq Fl d
+Delimiter for text format (default is tab):
+tab,space,comma
+.It Fl \-type Ar type Pq Fl t
+Transaction type (default is all):
+all,deposits,checks,withdrawals
+.El
+.Pp
+Date range options:
+.Pp
+.Bl -tag -compact -width ".Fl \-method Ar method Pq Fl m"
+.It Fl \-all Pq Fl A
+All time
+.It Fl \-current Pq Fl c
+Current statement (default)
+.It Fl \-yesterday Pq Fl y
+Yesterday only
+.It Fl 30 Fl 45 Fl 60 Fl 90
+Last N days
+.El
+.Pp
+Fixed date range (overrides other date options):
+.Pp
+.Bl -tag -compact  -width ".It Fl \-begin Ar MM/DD/YYYY Pq Fl b"
+.It Fl \-begin Ar MM/DD/YYYY Pq Fl b
+Start date
+.It Fl \-end Ar MM/DD/YYYY Pq Fl e
+End date
+.El
+.El
