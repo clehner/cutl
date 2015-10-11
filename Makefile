@@ -1,4 +1,4 @@
-BIN = gcfcu
+BIN = cutl
 PREFIX ?= /usr/local
 DESTDIR ?=
 BINDIR ?= $(PREFIX)/bin
