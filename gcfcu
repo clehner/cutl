@@ -366,7 +366,7 @@ tsv_to_ledger() {
 transactions() {
 	if test -n "$opt_help"; then
 		cat <<EOF
-Usage: $bin transactions [options]"
+Usage: $bin transactions [options]
 
 Get a listing of transactions in one or all accounts.
 
@@ -528,7 +528,7 @@ transactions_multi() {
 accounts_overview() {
 	if test -n "$opt_help"; then
 		cat <<EOF
-Usage: $bin accounts [options]"
+Usage: $bin accounts [options]
 
 List accounts and other details. Output a header with the account-holder's
 name and sign-on activity, followed by TSV of current accounts.
@@ -567,7 +567,7 @@ EOF
 
 bare() {
 	cat <<EOF
-Usage: $bin <command> [options]"
+Usage: $bin <command> [options]
 
 Access a credit union account
 
