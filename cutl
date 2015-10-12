@@ -14,7 +14,7 @@ tmp=
 viewstate=
 eventval=
 
-test -f "${CUTL_CONFIG_FILE:="${XDG_CONFIG_HOME:-~/.config}/cutlrc"}" &&
+test -f ${CUTL_CONFIG_FILE:=${XDG_CONFIG_HOME:-~/.config}/cutlrc} &&
 	. "$CUTL_CONFIG_FILE"
 
 cu_name=${CUTL_CU_NAME:-GeneseeCoopFCU}
