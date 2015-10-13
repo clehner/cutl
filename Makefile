@@ -19,7 +19,7 @@ install-bin: $(DESTDIR)$(BINDIR)
 	@chmod 755 $</$(BIN)
 
 install-man: $(DESTDIR)$(MANDIR)/man1
-	@$(CP) -vf man/$(BIN).1 $<
+	@$(CP) -vf $(BIN).1 $<
 	@chmod 644 $</$(BIN).1
 
 install: install-bin install-man
