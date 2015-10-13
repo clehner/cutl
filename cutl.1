@@ -1,6 +1,7 @@
 .Dd 2015-10-10
 .Dt CUTL 1
 .Os
+.ds REPO https://github.com/clehner/cutl
 .Sh NAME
 .Nm cutl
 .Nd Access credit union banking sites
@@ -27,7 +28,7 @@ starts, it reads a config file from under your home directory. In this file you
 can define environmental variables to customize cutl's operation. See the
 .Sx ENVIRONMENT
 section for more details.
-.Sh OPTIONS
+.Sh GLOBAL OPTIONS
 .Bl -tag -compact -width ".Fl \-method Ar method Pq Fl m"
 .It Fl \-help Pq Fl h
 Get info about a command
@@ -172,16 +173,44 @@ Directory for storing cached request data. Overridden by
 .Sh SEE ALSO
 .Xr ledger 1
 .Xr curl 1
+.Sh AUTHORS
+.Nm
+was written by
+.An Charles Lehner Aq Mt cel@celehner.com .
 .Sh BUGS
 Currently, login via
 .Cm text
 method does not work, and login via
 .Cm phone
-method is not fully tested.
+method is not fully tested. Log in after a session has expired is also not
+fully tested.
+.Pp
+Please report any other bugs to
+.Lk \*[REPO]
+.Sh COPYRIGHT
+Copyright \(co 2015 Charles Lehner
+.Pp
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+of the Software, and to permit persons to whom the Software is furnished to do
+so, subject to the following conditions:
+.Pp
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+.Pp
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 .Sh SECURITY CONSIDERATIONS
 The cookie jar file at
 .Ev $CUTL_COOKIEJAR
 stores session cookies when
 .Nm
-is logged in to the banking server, so it should have be appropriately
-protected.
+is logged in to the banking server, so it should be appropriately protected
+from unauthorized access.
