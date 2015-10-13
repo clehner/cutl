@@ -381,8 +381,7 @@ Options:
 Date range options:
     -A --all                All time
     -c --current            Current statement (default)
-    -y --yesterday          Yesterday only
-    -30 -45 -60 -90         Last N days
+    -1 -30 -45 -60 -90      Last N days
 
 Fixed date range (overrides other date options):
     -b --begin MM/DD/YYYY   Start date
@@ -406,10 +405,10 @@ EOF
 					-d|--delimiter) opt=delim;;
 					-c|--current) period=0;;
 					-A|--all) period=1;;
-					-y|--yesterday) period=3;;
 					--deposits) atype=2;;
 					--checks) atype=3;;
 					--withdrawals) atype=4;;
+					-1) period=3;;
 					-30) period=4;;
 					-45) period=5;;
 					-60) period=6;;
